@@ -4,6 +4,10 @@
 # remote. This guard exists so a copy pasted in here by accident is never
 # committed and pushed.
 drafts/
+
+# Showcase page and the LinkedIn export card: built here, published by
+# hand, deliberately not part of the public repo.
+docs/
 draft-*
 DRAFT-*
 *.draft.md
