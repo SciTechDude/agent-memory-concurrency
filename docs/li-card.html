@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Agent memory under concurrency — LinkedIn card</title>
+<style>
+  /* Export target: a single 1200x1124 PNG for LinkedIn. The height is the
+     measured natural content height, so there is no trailing dead space.
+     Light mode only, by request. The interactive version with hover and a
+     table view lives in showcase.html. */
+  .viz-root {
+    --surface-1:      #fcfcfb;
+    --page:           #f9f9f7;
+    --text-primary:   #0b0b0b;
+    --text-secondary: #52514e;
+    --text-muted:     #898781;
+    --grid:           #e1e0d9;
+    --axis:           #c3c2b7;
+    --border:         rgba(11,11,11,0.10);
+    --series-1:       #2a78d6;   /* validated against #fcfcfb, light */
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body { font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  .viz-root {
+    width: 1200px; height: 1124px;
+    background: var(--page); color: var(--text-primary);
+    padding: 40px 48px 32px;
+    display: flex; flex-direction: column;
+  }
+
+  h1 { font-size: 33px; line-height: 1.17; margin: 0 0 10px; letter-spacing: -0.015em; }
+  .sub { color: var(--text-secondary); font-size: 16.5px; margin: 0 0 22px; max-width: 94ch; }
+  .sub b { color: var(--text-primary); font-weight: 650; }
+
+  .panel {
+    background: var(--surface-1); border: 1px solid var(--border);
+    border-radius: 12px; padding: 20px 22px;
+  }
+  .ptitle { font-size: 17px; font-weight: 650; }
+  .pnote { color: var(--text-secondary); font-size: 13.5px; margin-top: 3px; }
+
+  .legend { display: flex; gap: 22px; align-items: center; font-size: 13.5px;
+            color: var(--text-secondary); margin-top: 11px; }
+  .legend span { display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; }
+  .legend svg { width: 15px; height: 15px; flex: 0 0 auto; }
+  #chart { display: block; width: 100%; height: auto; overflow: visible; }
+
+  .tick   { fill: var(--text-muted);   font-size: 12px; }
+  .rowlab { fill: var(--text-primary); font-size: 15px; }
+  .rowsub { fill: var(--text-muted);   font-size: 11.5px; }
+  .gaplab { fill: var(--text-secondary); font-size: 12.5px; font-weight: 650; }
+
+  .tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  .tile { background: var(--surface-1); border: 1px solid var(--border);
+          border-radius: 12px; padding: 20px 22px; }
+  .tile .fig { font-size: 38px; font-weight: 680; letter-spacing: -0.025em; line-height: 1.05; }
+  .tile .cap { color: var(--text-secondary); font-size: 14px; margin-top: 9px; }
+  .tile .src { color: var(--text-muted); font-size: 11.5px; margin-top: 11px; }
+  table { border-collapse: collapse; width: 100%; font-size: 13.5px; }
+  td, th { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--border); vertical-align: baseline; }
+  th { color: var(--text-muted); font-size: 11px; text-transform: uppercase; letter-spacing: .07em; font-weight: 650; }
+  tr:last-child td { border-bottom: 0; }
+  td.v { white-space: nowrap; font-variant-numeric: tabular-nums; width: 25%; }
+  td.s { color: var(--text-secondary); font-size: 12px; width: 27%; }
+  td.v b { font-size: 15px; }
+  .dim { color: var(--text-muted); font-size: 11.5px; }
+
+  footer { margin-top: auto; padding-top: 20px; display: flex;
+           justify-content: space-between; align-items: baseline; gap: 20px; }
+  .repo { font-size: 17px; font-weight: 650; }
+  .repo span { color: var(--series-1); }
+  .caveat { color: var(--text-muted); font-size: 11.5px; text-align: right; max-width: 46ch; }
+</style>
+</head>
+<body>
+<div class="viz-root">
+
+  <h1>Agent memory corrupts under concurrency.<br>The fixes are published — so why is the bug still shipping?</h1>
+  <p class="sub">
+    Eight failure modes documented, most with verified fixes and several with released code.
+    Four widely used libraries still carry <b>14 open defects</b> between them.
+    The bottleneck is not knowledge — it is <b>adoption</b>.
+  </p>
+
+  <div class="panel" style="margin-bottom:18px">
+    <div class="ptitle">Research maturity vs. production adoption, by failure mode</div>
+    <div class="pnote">Bar length is the gap: the answer exists and has not arrived.</div>
+    <div class="legend">
+      <span><svg viewBox="0 0 15 15"><circle cx="7.5" cy="7.5" r="5.5" fill="none" stroke="var(--series-1)" stroke-width="2.5"/></svg>Literature</span>
+      <span><svg viewBox="0 0 15 15"><circle cx="7.5" cy="7.5" r="5.5" fill="var(--series-1)"/></svg>Shipped software</span>
+    </div>
+    <svg id="chart" role="img" aria-label="For eight failure modes, research maturity sits at implemented or verified while production adoption sits at unaddressed or named."></svg>
+  </div>
+
+  <div class="tiles">
+    <div class="tile">
+      <div class="fig">88%</div>
+      <div class="cap">of concurrent writes lost with 16 writers. Exactly one survives, however many compete — 33% at 2 writers, 78% at 8.</div>
+      <div class="src">Own reproduction, mem0 v2.2.1</div>
+    </div>
+    <div class="tile">
+      <div class="fig">120 / 120</div>
+      <div class="cap">retracted agent runs corrupted shared state when unprotected. Plans get retracted in up to 44.5% of runs.</div>
+      <div class="src">arXiv 2606.17182 §V-K</div>
+    </div>
+    <div class="tile">
+      <div class="fig">14</div>
+      <div class="cap">concurrency defects open right now across four shipped libraries. One accepted P1-high, its fix unreviewed for four months.</div>
+      <div class="src">States re-checked 28 Nov 2026</div>
+    </div>
+  </div>
+
+  <footer>
+    <div class="repo">Full index, every citation and defect:<br><span>github.com/SciTechDude/agent-memory-concurrency</span></div>
+    <div class="caveat">Maturity positions are assessments from the cited sources, not objective measures. The index tags each entry by strength of sourcing.</div>
+  </footer>
+</div>
+
+<script type="module">
+const STAGES = ["Unaddressed","Named","Mechanism\nproposed","Implemented","Verified +\nmeasured"];
+const DATA = [
+  { m:"Retraction / causal cascade",        lit:4, prod:0, ev:"2606.17182 §V-K" },
+  { m:"Semantic conflict under merge",      lit:4, prod:0, ev:"CodeCRDT 2510.18893" },
+  { m:"Ordering violation",                 lit:4, prod:1, ev:"graphiti #2223 · langgraph #8039" },
+  { m:"Lost update (read-modify-write)",    lit:4, prod:1, ev:"mem0 #6243 · Letta ships OCC" },
+  { m:"Deduplication TOCTOU",               lit:3, prod:1, ev:"mem0 #6515 / #6531" },
+  { m:"Non-atomic multi-store write",       lit:2, prod:1, ev:"mem0 #7879 / #7792" },
+  { m:"Stale read / mixed-revision recall", lit:4, prod:2, ev:"graphiti PR #2211 pending" },
+  { m:"Predicate phantom (orphan check)",   lit:4, prod:2, ev:"graphiti #2159 → PR #2177" },
+];
+
+const W=1100, PADL=300, PADR=62, TOP=30, ROW=54;
+const H = TOP + DATA.length*ROW + 52;
+const x = v => PADL + (v/4)*(W-PADL-PADR);
+const NS="http://www.w3.org/2000/svg";
+const el=(n,a={})=>{const e=document.createElementNS(NS,n);for(const k in a)e.setAttribute(k,a[k]);return e;};
+const svg=document.getElementById("chart");
+svg.setAttribute("viewBox",`0 0 ${W} ${H}`);
+
+STAGES.forEach((s,i)=>{
+  svg.appendChild(el("line",{x1:x(i),y1:TOP-6,x2:x(i),y2:H-44,stroke:"var(--grid)","stroke-width":1}));
+  const anchor = i===0?"start":i===4?"end":"middle";
+  s.split("\n").forEach((ln,j)=>{
+    const t=el("text",{x:x(i),y:H-26+j*14,class:"tick","text-anchor":anchor});
+    t.textContent=ln; svg.appendChild(t);
+  });
+});
+svg.appendChild(el("line",{x1:PADL,y1:H-44,x2:W-PADR,y2:H-44,stroke:"var(--axis)","stroke-width":1}));
+
+DATA.forEach((d,i)=>{
+  const y=TOP+i*ROW+ROW/2-8;
+  const lab=el("text",{x:PADL-18,y:y+1,class:"rowlab","text-anchor":"end"}); lab.textContent=d.m;
+  svg.appendChild(lab);
+  const sub=el("text",{x:PADL-18,y:y+16,class:"rowsub","text-anchor":"end"}); sub.textContent=d.ev;
+  svg.appendChild(sub);
+
+  svg.appendChild(el("line",{x1:x(d.prod),y1:y,x2:x(d.lit),y2:y,
+    stroke:"var(--series-1)","stroke-width":2,"stroke-linecap":"round",opacity:.45}));
+  // filled dot = shipped; surface ring beneath for overlap safety
+  svg.appendChild(el("circle",{cx:x(d.prod),cy:y,r:8,fill:"var(--surface-1)"}));
+  svg.appendChild(el("circle",{cx:x(d.prod),cy:y,r:6,fill:"var(--series-1)"}));
+  // hollow ring = literature
+  svg.appendChild(el("circle",{cx:x(d.lit),cy:y,r:8,fill:"var(--surface-1)"}));
+  svg.appendChild(el("circle",{cx:x(d.lit),cy:y,r:6,fill:"none",stroke:"var(--series-1)","stroke-width":2.5}));
+
+  const g=el("text",{x:W-PADR+14,y:y+5,class:"gaplab"}); g.textContent=`+${d.lit-d.prod}`;
+  svg.appendChild(g);
+});
+</script>
+</body>
+</html>
