@@ -1,0 +1,16 @@
+# This repository is public. Anything unpublished stays out of it.
+#
+# Post and article drafts live in the private working repo, which has no
+# remote. This guard exists so a copy pasted in here by accident is never
+# committed and pushed.
+drafts/
+draft-*
+DRAFT-*
+*.draft.md
+
+# Scratch and local tooling
+.DS_Store
+node_modules/
+*.log
+.venv/
+__pycache__/
